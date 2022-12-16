@@ -1,4 +1,6 @@
-// 초기 상태 설정
+const mongoClient = require("../mongoConnect");
+const _client = mongoClient.connect();
+
 const initState = {
   mbtiResult: "",
   page: 0, // 0: 인트로 페이지, 1 ~ n: 선택 페이지, n+1: 결과 페이지
@@ -128,72 +130,38 @@ const initState = {
   },
 };
 
-const initStateEmpty = {
-  mbtiResult: "",
-  page: 0,
-  survey: [],
-  explanation: {},
+const mongoDB = {
+  setData: async () => {
+    const client = await _client; // collection 이 없으면 알아서 생성
+    const db = client.db("mbti-4th").collection("data"); // redux 의 데이터를 그대로 mongodb 에 삽입
+    const result = await db.insertOne(initState);
+    if (result.acknowledged) {
+      return "업데이트 성공";
+    } else {
+      throw new Error("통신 이상");
+    }
+  },
+  getCounts: async () => {
+    const client = await _client;
+    const db = client.db("mbti-4th").collection("counts");
+    const data = await db.find({}).toArray();
+    return data;
+  },
+  incCounts: async () => {
+    const client = await _client;
+    const db = client.db("mbti-4th").collection("counts");
+    const result = await db.updateOne({ id: 1 }, { $inc: { counts: +1 } });
+    if (result.acknowledged) {
+      return "업데이트 성공";
+    } else {
+      throw new Error("통신 이상");
+    }
+  },
+  getData: async () => {
+    const client = await _client;
+    const db = client.db("mbti-4th").collection("data");
+    const data = await db.find({}).toArray();
+    return data;
+  },
 };
-
-// 액션 타입(문자열)
-const INIT = "mbti/INIT";
-const CHECK = "mbti/CHECK";
-const NEXT = "mbti/NEXT";
-const RESET = "mbti/RESET";
-
-// 액션 생성 함수
-// payload -> 선택에 다른 결과 값 result 전달 필요
-// 액션 생성 함수 추가
-export function init(data) {
-  return {
-    type: INIT,
-    payload: data,
-  };
-}
-
-export function check(result) {
-  return {
-    type: CHECK,
-    payload: { result },
-  };
-}
-export function next() {
-  return {
-    type: NEXT,
-  };
-}
-export function reset() {
-  return {
-    type: RESET,
-  };
-}
-
-// 리듀서
-export default function mbti(state = initStateEmpty, action) {
-  switch (action.type) {
-    case INIT:
-      return {
-        ...state,
-        survey: action.payload.survey,
-        explaination: action.payload.explaination,
-      };
-    case CHECK:
-      return {
-        ...state,
-        mbtiResult: state.mbtiResult + action.payload.result,
-      };
-    case NEXT:
-      return {
-        ...state,
-        page: state.page + 1,
-      };
-    case RESET:
-      return {
-        ...state,
-        page: 0,
-        mbtiResult: "",
-      };
-    default:
-      return state;
-  }
-}
+module.exports = mongoDB;
